@@ -23,7 +23,7 @@ class Role(enum.Enum):
         key="Minion",
         name="Minion of Mordred",
         side=_Side.EVIL,
-        know=("Minion"),
+        know=("Minion", "Mordred", "Morgana", "Assassin"),
     )
     Servant = _Role(
         key="Servant",
@@ -35,7 +35,37 @@ class Role(enum.Enum):
         key="Merlin",
         name="Merlin",
         side=_Side.GOOD,
-        know=("Minion"),
+        know=("Minion", "Morgana", "Assassin", "Oberon"),
+    )
+    Mordred = _Role(
+        key="Mordred",
+        name="Mordred",
+        side=_Side.EVIL,
+        know=("Minion", "Mordred", "Morgana", "Assassin"),
+    )
+    Morgana = _Role(
+        key="Morgana",
+        name="Morgana",
+        side=_Side.EVIL,
+        know=("Minion", "Mordred", "Morgana", "Assassin"),
+    )
+    Percival = _Role(
+        key="Percival",
+        name="Percival",
+        side=_Side.GOOD,
+        know=("Merlin", "Morgana"),
+    )
+    Assassin = _Role(
+        key="Assassin",
+        name="Assassin",
+        side=_Side.EVIL,
+        know=("Minion", "Mordred", "Morgana", "Assassin"),
+    )
+    Oberon = _Role(
+        key="Oberon",
+        name="Oberon",
+        side=_Side.EVIL,
+        know=(),
     )
 
 

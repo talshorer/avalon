@@ -35,7 +35,13 @@ ADDRESS = ("127.0.0.1", 7015)
 
 def server():
     nplayers = 8
-    roles = [avalon.Role.Merlin]
+    roles = [
+        avalon.Role.Merlin,
+        avalon.Role.Mordred,
+        avalon.Role.Morgana,
+        avalon.Role.Percival,
+        avalon.Role.Oberon,
+    ]
 
     s = socket.socket()
     s.bind(ADDRESS)
