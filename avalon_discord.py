@@ -54,17 +54,14 @@ async def on_message(message):
         players = []
         roles = []
         for part in content.split()[1:]:
-            member = get_member(part, message.mentions)
-            if member is not None:
+            if (member := get_member(part, message.mentions)) is not None:
                 players.append(DiscordPlayer(member))
-                continue
-            role = get_role(part)
-            if role is not None:
+            elif (role := get_role(part)) is not None:
                 roles.append(role)
-                continue
-            await message.channel.send(
-                f"Sorry, don't know what to do with {part}")
-            return
+            else:
+                await message.channel.send(
+                    f"Sorry, don't know what to do with {part}")
+                return
         await avalon.play(players, roles)
 
 
