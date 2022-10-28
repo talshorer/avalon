@@ -3,7 +3,7 @@
 import socket
 import asyncio
 
-import avalon
+from . import avalon
 
 
 class CliPlayer(avalon.Player):

@@ -5,7 +5,7 @@ import dotenv
 import discord
 import asyncio
 
-import avalon
+from . import avalon
 
 client = discord.Client()
 
