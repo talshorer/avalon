@@ -7,7 +7,13 @@ import asyncio
 
 import avalon
 
-client = discord.Client()
+client = discord.Client(
+    intents=discord.Intents(
+        messages=True,
+        message_content=True,
+        guilds=True,
+    ),
+)
 
 
 def to_mention(member):
