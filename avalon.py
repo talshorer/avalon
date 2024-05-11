@@ -1,15 +1,15 @@
 #! /usr/bin/python3
 
+from __future__ import annotations
+
 import abc
+import dataclasses
+import itertools
 import random
 import enum
 import collections
 import asyncio
 from typing import Dict, List, Tuple
-
-
-class AvalonPlayer:
-    pass
 
 
 class _Side(enum.Enum):
@@ -79,26 +79,101 @@ class Player(abc.ABC):
     async def send(self, msg: str) -> None: ...
 
     @abc.abstractmethod
-    async def input(self, kind: str) -> str: ...
+    async def input_players(self, msg: str) -> List[str]: ...
+
+    @abc.abstractmethod
+    async def input_vote(self, msg: str) -> bool: ...
 
 
-_Rules = collections.namedtuple("_Rules", ["total_evil"])
+@dataclasses.dataclass
+class _Quest:
+    num_players: int
+    required_fails: int
+
+
+@dataclasses.dataclass
+class _Rules:
+    total_evil: int
+    quests: List[_Quest]
+
+
 _rules = {
-    5: _Rules(2),
-    6: _Rules(2),
-    7: _Rules(3),
-    8: _Rules(3),
-    9: _Rules(3),
-    10: _Rules(4),
+    5: _Rules(
+        2,
+        [
+            _Quest(2, 1),
+            _Quest(3, 1),
+            _Quest(2, 1),
+            _Quest(3, 1),
+            _Quest(3, 1),
+        ],
+    ),
+    6: _Rules(
+        2,
+        [
+            _Quest(2, 1),
+            _Quest(3, 1),
+            _Quest(4, 1),
+            _Quest(3, 1),
+            _Quest(4, 1),
+        ],
+    ),
+    7: _Rules(
+        3,
+        [
+            _Quest(2, 1),
+            _Quest(3, 1),
+            _Quest(3, 1),
+            _Quest(4, 2),
+            _Quest(4, 1),
+        ],
+    ),
+    8: _Rules(
+        3,
+        [
+            _Quest(3, 1),
+            _Quest(4, 1),
+            _Quest(4, 1),
+            _Quest(5, 2),
+            _Quest(5, 1),
+        ],
+    ),
+    9: _Rules(
+        3,
+        [
+            _Quest(3, 1),
+            _Quest(4, 1),
+            _Quest(4, 1),
+            _Quest(5, 2),
+            _Quest(5, 1),
+        ],
+    ),
+    10: _Rules(
+        4,
+        [
+            _Quest(3, 1),
+            _Quest(4, 1),
+            _Quest(4, 1),
+            _Quest(5, 2),
+            _Quest(5, 1),
+        ],
+    ),
 }
+
+_MAX_QUEST_VOTES = 5
+
+
+class QuestResult(enum.Enum):
+    SUCCESS = "succeeded"
+    FAILURE = "failed"
 
 
 class Game:
     def __init__(self, players: List[Player], roles: List[Role]):
         self.players = players
         self.roles = roles
-        active_rules = _rules[len(players)]
-        evils = active_rules.total_evil
+        self.active_rules = _rules[len(players)]
+        evils = self.active_rules.total_evil
         goods = len(players) - evils
         evil_roles = [r for r in roles if r.value.side == _Side.EVIL]
         good_roles = [r for r in roles if r.value.side == _Side.GOOD]
@@ -111,14 +186,16 @@ class Game:
         all_roles = evil_roles + good_roles
         random.shuffle(all_roles)
         self.player_map = list(zip(players, all_roles))
+        self.commander_order = itertools.cycle(self.players)
 
     async def broadcast(self, msg: str) -> None:
         await asyncio.gather(*[player.send(msg) for player in self.players])
 
-    async def vote(self) -> Dict[str, str]:
-        results = await asyncio.gather(
-            *[player.input("vote") for player in self.players]
-        )
+    async def vote(self, onwhat: str, players: List[Player]) -> Dict[str, bool]:
+        async def vote_one(player: Player) -> bool:
+            return await player.input_vote(onwhat)
+
+        results = await asyncio.gather(*[vote_one(player) for player in players])
         return {player.name: result for player, result in zip(self.players, results)}
 
     async def send_initial_info(self, idx: int) -> None:
@@ -135,7 +212,81 @@ class Game:
             await player.send("Here are the players you should know about:")
             await player.send(" ".join(know))
 
+    async def nominate(self, quest: _Quest) -> Tuple[List[Player], str]:
+        commander = next(self.commander_order)
+        await self.broadcast(f"The residing lord commander is {commander.name}")
+        while True:
+            nomination = await commander.input_players(
+                f"Lord commander! Select {quest.num_players} knights to go on this quest!"
+            )
+            knights = [player for player in self.players if player.name in nomination]
+            if len(knights) == quest.num_players:
+                knight_names = " ".join([k.name for k in knights])
+                await self.broadcast(
+                    f"The lord commander nominates {knight_names} for this quest!"
+                )
+                return knights, knight_names
+
+    async def quest(self, quest: _Quest) -> QuestResult:
+        await self.broadcast(
+            "\n".join(
+                [
+                    "=" * 40,
+                    f"We are going on a quest!",
+                    f"{quest.num_players} knights will go on this quest",
+                    f"This quest will fail if {quest.required_fails} participants will betray us",
+                ]
+            )
+        )
+
+        for itry in range(_MAX_QUEST_VOTES - 1):
+            await self.broadcast(f"Vote #{itry+1} will begin shortly")
+            knights, knight_names = await self.nominate(quest)
+            go_vote = await self.vote(
+                f"Should {knight_names} go on a quest?", self.players
+            )
+            ctr = collections.Counter(go_vote.values())
+            go = ctr[True] > ctr[False]
+            await self.broadcast(
+                "\n".join(
+                    [
+                        f"The table voted thus:",
+                        *[
+                            k + ": " + ("aye" if v else "nay")
+                            for k, v in go_vote.items()
+                        ],
+                        "This quest will {}go forward".format("" if go else "not "),
+                    ]
+                )
+            )
+            if go:
+                break
+        else:
+            await self.broadcast(
+                "All votes have failed! The lord commander alone shall select the knights for the next quest!"
+            )
+            knights, knight_names = await self.nominate(quest)
+
+        await self.broadcast(f"{knight_names} are going on a quest!")
+        quest_vote = await self.vote("Betray the quest?", knights)
+        ctr = collections.Counter(quest_vote.values())
+        betrayals = ctr[True]
+        if betrayals:
+            await self.broadcast(f"We have been betrayed by {betrayals} knights")
+        else:
+            await self.broadcast("None of the knights betrayed us")
+        if betrayals >= quest.required_fails:
+            result = QuestResult.FAILURE
+        else:
+            result = QuestResult.SUCCESS
+        await self.broadcast(f"The quest {result.value}!")
+        return result
+
     async def play(self) -> None:
         await asyncio.gather(
             *[self.send_initial_info(idx) for idx in range(len(self.player_map))]
         )
+        failures = 0
+        for quest_idx, quest in enumerate(self.active_rules.quests):
+            result = await self.quest(quest)
+            failures += result is QuestResult.FAILURE

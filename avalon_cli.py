@@ -20,11 +20,19 @@ class CliPlayer(avalon.Player):
             data += await loop.sock_recv(self.c, 0x1000)
         return data.decode().strip()
 
-    async def input(self, kind: str = "") -> str:
+    async def input(self) -> str:
         loop = asyncio.get_event_loop()
         await loop.sock_sendall(self.c, b"I\n")
         data = await self.read()
         return data
+
+    async def input_players(self, msg: str) -> List[str]:
+        await self.send(msg)
+        return (await self.input()).split(" ")
+
+    async def input_vote(self, msg: str) -> bool:
+        await self.send(msg)
+        return (await self.input()) == "+"
 
     async def send(self, msg: str) -> None:
         loop = asyncio.get_event_loop()

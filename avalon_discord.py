@@ -30,7 +30,10 @@ class DiscordPlayer(avalon.Player):
         self.member = member
         super().__init__(to_mention(member))
 
-    async def input(self, kind: str) -> str:
+    async def input_players(self, msg: str) -> List[str]:
+        raise NotImplementedError
+
+    async def input_vote(self, msg: str) -> bool:
         raise NotImplementedError
 
     async def send(self, msg: str) -> None:
