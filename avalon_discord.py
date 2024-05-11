@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import dataclasses
 import os
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 from typing_extensions import ParamSpec
@@ -21,6 +22,15 @@ client = discord.Client(
 Member = Union[discord.User, discord.Member]
 
 
+@dataclasses.dataclass
+class NominationOption:
+    nick: str
+    name: str
+    mention: str
+
+
+EMPTY_NOMINATION = NominationOption("", "", "")
+
 waiters: Dict[str, "asyncio.Future[discord.Message]"] = {}
 
 
@@ -31,7 +41,11 @@ def to_mention(member: Member) -> str:
 class DiscordPlayer(avalon.Player):
     def __init__(self, member: Member):
         self.member = member
+        self.map: Dict[int, NominationOption] = {}
         super().__init__(to_mention(member))
+
+    def set_map(self, map: Dict[int, NominationOption]) -> None:
+        self.map = map
 
     async def io(self, msg: str) -> discord.Message:
         waiters[self.name] = asyncio.Future()
@@ -40,8 +54,12 @@ class DiscordPlayer(avalon.Player):
         return waiters.pop(self.name).result()
 
     async def input_players(self, msg: str) -> List[str]:
+        msg += "\n" + "\n".join(
+            [f"{i}: {option.nick} / {option.name}" for i, option in self.map.items()]
+        )
         reply = await self.io(msg)
-        return [to_mention(member) for member in reply.mentions]
+        ids = reply.content.split(" ")
+        return [self.map.get(int(i), EMPTY_NOMINATION).mention for i in ids]
 
     async def input_vote(self, msg: str) -> bool:
         reply = await self.io(msg)
@@ -95,6 +113,17 @@ async def summon(message: discord.Message) -> None:
                 continue
             await message.channel.send(f"Sorry, don't know what to do with {part}")
             return
+        map = {}
+        for i, player in enumerate(players):
+            assert isinstance(player, DiscordPlayer)
+            map[i] = NominationOption(
+                nick=getattr(player.member, "nick", ""),
+                name=player.member.name,
+                mention=to_mention(player.member),
+            )
+        for player in players:
+            assert isinstance(player, DiscordPlayer)
+            player.set_map(map)
         await avalon.Game(players, roles).play()
 
 
