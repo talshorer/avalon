@@ -98,8 +98,7 @@ async def broadcast(players: List[Player], msg: str) -> None:
 
 
 async def vote(players: List[Player]) -> Dict[str, str]:
-    results = await asyncio.gather(*[
-        player.input("vote") for player in players])
+    results = await asyncio.gather(*[player.input("vote") for player in players])
     return {player.name: result for player, result in zip(players, results)}
 
 
@@ -136,5 +135,6 @@ async def play(players: List[Player], roles: List[Role]) -> None:
     all_roles = evil_roles + good_roles
     random.shuffle(all_roles)
     player_map = list(zip(players, all_roles))
-    await asyncio.gather(*[send_initial_info(
-        player, role, player_map) for player, role in player_map])
+    await asyncio.gather(
+        *[send_initial_info(player, role, player_map) for player, role in player_map]
+    )

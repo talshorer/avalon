@@ -20,6 +20,7 @@ client = discord.Client(
 
 Member = Union[discord.User, discord.Member]
 
+
 def to_mention(member: Member) -> str:
     return f"<@{member.id}>"
 
@@ -70,8 +71,7 @@ async def on_message(message: discord.Message) -> None:
             if role is not None:
                 roles.append(role)
                 continue
-            await message.channel.send(
-                f"Sorry, don't know what to do with {part}")
+            await message.channel.send(f"Sorry, don't know what to do with {part}")
             return
         await avalon.play(players, roles)
 
@@ -79,7 +79,7 @@ async def on_message(message: discord.Message) -> None:
 @client.event
 async def on_ready() -> None:
     assert client.user is not None
-    print(f'{client.user.name} has connected to Discord!')
+    print(f"{client.user.name} has connected to Discord!")
 
 
 async def main() -> None:
