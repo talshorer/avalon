@@ -1,7 +1,7 @@
 #! /usr/bin/python3
 
 import os
-from typing import Any, Callable, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 from typing_extensions import ParamSpec
 import dotenv
 import discord
@@ -21,6 +21,9 @@ client = discord.Client(
 Member = Union[discord.User, discord.Member]
 
 
+waiters: Dict[str, "asyncio.Future[discord.Message]"] = {}
+
+
 def to_mention(member: Member) -> str:
     return f"<@{member.id}>"
 
@@ -30,11 +33,19 @@ class DiscordPlayer(avalon.Player):
         self.member = member
         super().__init__(to_mention(member))
 
+    async def io(self, msg: str) -> discord.Message:
+        waiters[self.name] = asyncio.Future()
+        await self.send(msg)
+        await waiters[self.name]
+        return waiters.pop(self.name).result()
+
     async def input_players(self, msg: str) -> List[str]:
-        raise NotImplementedError
+        reply = await self.io(msg)
+        return [to_mention(member) for member in reply.mentions]
 
     async def input_vote(self, msg: str) -> bool:
-        raise NotImplementedError
+        reply = await self.io(msg)
+        return reply.content == "+"
 
     async def send(self, msg: str) -> None:
         await self.member.send(msg)
@@ -56,10 +67,18 @@ def get_role(part: str) -> Optional[avalon.Role]:
 
 @client.event
 async def on_message(message: discord.Message) -> None:
+    if message.author == client.user:
+        return
+    if isinstance(message.channel, discord.DMChannel):
+        await collect_input(message)
+    elif isinstance(message.channel, discord.TextChannel):
+        await summon(message)
+
+
+async def summon(message: discord.Message) -> None:
+    assert isinstance(message.channel, discord.TextChannel)
     trigger = "!avalon "
     content = message.content
-    if not isinstance(message.channel, discord.TextChannel):
-        return
     if content.startswith(trigger):
         print(f"Summon message on channel {message.channel.name}")
         print(f"Content: {content}")
@@ -77,6 +96,12 @@ async def on_message(message: discord.Message) -> None:
             await message.channel.send(f"Sorry, don't know what to do with {part}")
             return
         await avalon.Game(players, roles).play()
+
+
+async def collect_input(message: discord.Message) -> None:
+    waiter = waiters.get(to_mention(message.author))
+    if waiter:
+        waiter.set_result(message)
 
 
 @client.event
