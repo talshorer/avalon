@@ -30,7 +30,7 @@ class DiscordPlayer(avalon.Player):
         self.member = member
         super().__init__(to_mention(member))
 
-    async def input(self, kind: str = "") -> str:
+    async def input(self, kind: str) -> str:
         raise NotImplementedError
 
     async def send(self, msg: str) -> None:
@@ -73,7 +73,7 @@ async def on_message(message: discord.Message) -> None:
                 continue
             await message.channel.send(f"Sorry, don't know what to do with {part}")
             return
-        await avalon.play(players, roles)
+        await avalon.Game(players, roles).play()
 
 
 @client.event

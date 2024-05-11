@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import abc
 import random
 import enum
 import collections
@@ -70,16 +71,15 @@ class Role(enum.Enum):
     )
 
 
-# TODO make abstract...
-class Player:
+class Player(abc.ABC):
     def __init__(self, name: str):
         self.name = name
 
-    async def send(self, msg: str) -> None:
-        pass
+    @abc.abstractmethod
+    async def send(self, msg: str) -> None: ...
 
-    async def input(self, kind: str) -> str:
-        return ""
+    @abc.abstractmethod
+    async def input(self, kind: str) -> str: ...
 
 
 _Rules = collections.namedtuple("_Rules", ["total_evil"])
@@ -93,48 +93,49 @@ _rules = {
 }
 
 
-async def broadcast(players: List[Player], msg: str) -> None:
-    await asyncio.gather(*[player.send(msg) for player in players])
+class Game:
+    def __init__(self, players: List[Player], roles: List[Role]):
+        self.players = players
+        self.roles = roles
+        active_rules = _rules[len(players)]
+        evils = active_rules.total_evil
+        goods = len(players) - evils
+        evil_roles = [r for r in roles if r.value.side == _Side.EVIL]
+        good_roles = [r for r in roles if r.value.side == _Side.GOOD]
+        if len(evil_roles) > evils:
+            raise ValueError("Too many evil roles")
+        if len(good_roles) > goods:
+            raise ValueError("Too many good roles")
+        evil_roles.extend([Role.Minion] * (evils - len(evil_roles)))
+        good_roles.extend([Role.Servant] * (goods - len(good_roles)))
+        all_roles = evil_roles + good_roles
+        random.shuffle(all_roles)
+        self.player_map = list(zip(players, all_roles))
 
+    async def broadcast(self, msg: str) -> None:
+        await asyncio.gather(*[player.send(msg) for player in self.players])
 
-async def vote(players: List[Player]) -> Dict[str, str]:
-    results = await asyncio.gather(*[player.input("vote") for player in players])
-    return {player.name: result for player, result in zip(players, results)}
+    async def vote(self) -> Dict[str, str]:
+        results = await asyncio.gather(
+            *[player.input("vote") for player in self.players]
+        )
+        return {player.name: result for player, result in zip(self.players, results)}
 
+    async def send_initial_info(self, idx: int) -> None:
+        player, role = self.player_map[idx]
+        await player.send(f"Welcome to Avalon, {player.name}!")
+        await player.send(f"Your role is {role.value.name}")
+        know = []
+        for other_player, other_role in self.player_map:
+            if other_player is player:
+                continue
+            if other_role.value.key in role.value.know:
+                know.append(other_player.name)
+        if know:
+            await player.send("Here are the players you should know about:")
+            await player.send(" ".join(know))
 
-async def send_initial_info(
-    player: Player,
-    role: Role,
-    player_map: List[Tuple[Player, Role]],
-) -> None:
-    await player.send(f"Welcome to Avalon, {player.name}!")
-    await player.send(f"Your role is {role.value.name}")
-    know = []
-    for other_player, other_role in player_map:
-        if other_player is player:
-            continue
-        if other_role.value.key in role.value.know:
-            know.append(other_player.name)
-    if know:
-        await player.send("Here are the players you should know about:")
-        await player.send(" ".join(know))
-
-
-async def play(players: List[Player], roles: List[Role]) -> None:
-    active_rules = _rules[len(players)]
-    evils = active_rules.total_evil
-    goods = len(players) - evils
-    evil_roles = [r for r in roles if r.value.side == _Side.EVIL]
-    good_roles = [r for r in roles if r.value.side == _Side.GOOD]
-    if len(evil_roles) > evils:
-        raise ValueError("Too many evil roles")
-    if len(good_roles) > goods:
-        raise ValueError("Too many good roles")
-    evil_roles.extend([Role.Minion] * (evils - len(evil_roles)))
-    good_roles.extend([Role.Servant] * (goods - len(good_roles)))
-    all_roles = evil_roles + good_roles
-    random.shuffle(all_roles)
-    player_map = list(zip(players, all_roles))
-    await asyncio.gather(
-        *[send_initial_info(player, role, player_map) for player, role in player_map]
-    )
+    async def play(self) -> None:
+        await asyncio.gather(
+            *[self.send_initial_info(idx) for idx in range(len(self.player_map))]
+        )

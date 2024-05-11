@@ -56,7 +56,7 @@ def server() -> None:
         c.setblocking(False)
         players.append(CliPlayer(c))
     players.sort(key=lambda player: player.name)
-    asyncio.get_event_loop().run_until_complete(avalon.play(players, roles))
+    asyncio.get_event_loop().run_until_complete(avalon.Game(players, roles).play())
 
 
 def client(name: str) -> None:
