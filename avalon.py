@@ -4,6 +4,7 @@ import random
 import enum
 import collections
 import asyncio
+from typing import Dict, List, Tuple
 
 
 class AvalonPlayer:
@@ -71,11 +72,14 @@ class Role(enum.Enum):
 
 # TODO make abstract...
 class Player:
-    async def send(self):
+    def __init__(self, name: str):
+        self.name = name
+
+    async def send(self, msg: str) -> None:
         pass
 
-    async def input(self, kind):
-        pass
+    async def input(self, kind: str) -> str:
+        return ""
 
 
 _Rules = collections.namedtuple("_Rules", ["total_evil"])
@@ -89,17 +93,21 @@ _rules = {
 }
 
 
-async def broadcast(players, msg):
+async def broadcast(players: List[Player], msg: str) -> None:
     await asyncio.gather(*[player.send(msg) for player in players])
 
 
-async def vote(players):
+async def vote(players: List[Player]) -> Dict[str, str]:
     results = await asyncio.gather(*[
         player.input("vote") for player in players])
     return {player.name: result for player, result in zip(players, results)}
 
 
-async def send_initial_info(player, role, player_map):
+async def send_initial_info(
+    player: Player,
+    role: Role,
+    player_map: List[Tuple[Player, Role]],
+) -> None:
     await player.send(f"Welcome to Avalon, {player.name}!")
     await player.send(f"Your role is {role.value.name}")
     know = []
@@ -113,7 +121,7 @@ async def send_initial_info(player, role, player_map):
         await player.send(" ".join(know))
 
 
-async def play(players, roles):
+async def play(players: List[Player], roles: List[Role]) -> None:
     active_rules = _rules[len(players)]
     evils = active_rules.total_evil
     goods = len(players) - evils

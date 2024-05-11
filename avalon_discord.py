@@ -1,6 +1,8 @@
 #! /usr/bin/python3
 
 import os
+from typing import Any, Callable, List, Optional, TypeVar, Union
+from typing_extensions import ParamSpec
 import dotenv
 import discord
 import asyncio
@@ -16,42 +18,48 @@ client = discord.Client(
 )
 
 
-def to_mention(member):
+Member = Union[discord.User, discord.Member]
+
+def to_mention(member: Member) -> str:
     return f"<@{member.id}>"
 
 
 class DiscordPlayer(avalon.Player):
-    def __init__(self, member):
+    def __init__(self, member: Member):
         self.member = member
-        self.name = to_mention(member)
+        super().__init__(to_mention(member))
 
-    async def input(self, kind=""):
+    async def input(self, kind: str = "") -> str:
         raise NotImplementedError
 
-    async def send(self, msg):
+    async def send(self, msg: str) -> None:
         await self.member.send(msg)
 
 
-def get_member(part, mentions):
+def get_member(part: str, mentions: List[Member]) -> Optional[Member]:
     for member in mentions:
         if part == to_mention(member):
             return member
+    return None
 
 
-def get_role(part):
+def get_role(part: str) -> Optional[avalon.Role]:
     for role in avalon.Role:
         if part == role.value.key:
             return role
+    return None
 
 
 @client.event
-async def on_message(message):
+async def on_message(message: discord.Message) -> None:
     trigger = "!avalon "
     content = message.content
+    if not isinstance(message.channel, discord.TextChannel):
+        return
     if content.startswith(trigger):
         print(f"Summon message on channel {message.channel.name}")
         print(f"Content: {content}")
-        players = []
+        players: List[avalon.Player] = []
         roles = []
         for part in content.split()[1:]:
             member = get_member(part, message.mentions)
@@ -69,13 +77,15 @@ async def on_message(message):
 
 
 @client.event
-async def on_ready():
+async def on_ready() -> None:
+    assert client.user is not None
     print(f'{client.user.name} has connected to Discord!')
 
 
-async def main():
+async def main() -> None:
     dotenv.load_dotenv()
     token = os.getenv("DISCORD_TOKEN_AVALON")
+    assert token is not None
     await client.start(token)
 
 

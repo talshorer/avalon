@@ -2,29 +2,31 @@
 
 import socket
 import asyncio
+from typing import List
 
 import avalon
 
 
 class CliPlayer(avalon.Player):
-    def __init__(self, c):
+    def __init__(self, c: socket.socket):
         self.c = c
-        self.name = asyncio.get_event_loop().run_until_complete(self.read())
+        name = asyncio.get_event_loop().run_until_complete(self.read())
+        super().__init__(name)
 
-    async def read(self):
+    async def read(self) -> str:
         loop = asyncio.get_event_loop()
         data = b""
         while not data.endswith(b"\n"):
             data += await loop.sock_recv(self.c, 0x1000)
         return data.decode().strip()
 
-    async def input(self, kind=""):
+    async def input(self, kind: str = "") -> str:
         loop = asyncio.get_event_loop()
         await loop.sock_sendall(self.c, b"I\n")
         data = await self.read()
         return data
 
-    async def send(self, msg):
+    async def send(self, msg: str) -> None:
         loop = asyncio.get_event_loop()
         print(self.name, msg)
         await loop.sock_sendall(self.c, b"P" + msg.encode() + b"\n")
@@ -33,7 +35,7 @@ class CliPlayer(avalon.Player):
 ADDRESS = ("127.0.0.1", 7015)
 
 
-def server():
+def server() -> None:
     nplayers = 8
     roles = [
         avalon.Role.Merlin,
@@ -48,7 +50,7 @@ def server():
     s.listen(nplayers)
 
     print(f"Waiting for {nplayers} players")
-    players = []
+    players: List[avalon.Player] = []
     while len(players) < nplayers:
         c, _ = s.accept()
         c.setblocking(False)
@@ -57,7 +59,7 @@ def server():
     asyncio.get_event_loop().run_until_complete(avalon.play(players, roles))
 
 
-def client(name):
+def client(name: str) -> None:
     s = socket.socket()
     s.connect(ADDRESS)
     s.sendall(name.encode() + b"\n")
