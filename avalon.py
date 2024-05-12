@@ -9,7 +9,7 @@ import dataclasses
 import enum
 import itertools
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class _Side(enum.Enum):
@@ -294,3 +294,9 @@ class Game:
                 "Current score:\n"
                 + ("\n".join([(s.value + ": " + str(score[s])) for s in _Side]))
             )
+            (leading_team, nr_wins) = max(score.items(), key=lambda item: item[1])
+            if nr_wins > len(self.active_rules.quests) // 2:
+                break
+        else:
+            raise ValueError("no victory")
+        await self.broadcast(f"The {leading_team.value.lower()} team won!")
