@@ -26,9 +26,12 @@ class CliPlayer(avalon.Player):
         data = await self.read()
         return data
 
-    async def input_players(self, msg: str) -> List[str]:
-        await self.send(msg)
-        return (await self.input()).split(" ")
+    async def input_players(self, msg: str, count: int) -> List[str]:
+        while True:
+            await self.send(msg)
+            reply = (await self.input()).split(" ")
+            if len(reply) == count:
+                return reply
 
     async def input_vote(self, msg: str) -> bool:
         await self.send(msg)

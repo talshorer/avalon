@@ -79,7 +79,7 @@ class Player(abc.ABC):
     async def send(self, msg: str) -> None: ...
 
     @abc.abstractmethod
-    async def input_players(self, msg: str) -> List[str]: ...
+    async def input_players(self, msg: str, count: int) -> List[str]: ...
 
     @abc.abstractmethod
     async def input_vote(self, msg: str) -> bool: ...
@@ -217,7 +217,8 @@ class Game:
         await self.broadcast(f"The residing lord commander is {commander.name}")
         while True:
             nomination = await commander.input_players(
-                f"Lord commander! Select {quest.num_players} knights to go on this quest!"
+                f"Lord commander! Select {quest.num_players} knights to go on this quest!",
+                quest.num_players,
             )
             knights = [player for player in self.players if player.name in nomination]
             if len(knights) == quest.num_players:
