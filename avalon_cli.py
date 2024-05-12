@@ -1,7 +1,7 @@
 #! /usr/bin/python3
 
-import socket
 import asyncio
+import socket
 from typing import List
 
 import avalon

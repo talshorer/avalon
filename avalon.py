@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import abc
+import asyncio
+import collections
 import dataclasses
+import enum
 import itertools
 import random
-import enum
-import collections
-import asyncio
 from typing import Dict, List, Tuple
 
 
