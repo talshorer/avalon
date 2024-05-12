@@ -229,13 +229,15 @@ class Game:
                 return knights, knight_names
 
     async def quest(self, quest: _Quest) -> QuestResult:
+        noun_s = "s" if quest.required_fails > 1 else ""
+        verb_s = "" if quest.required_fails > 1 else "s"
         await self.broadcast(
             "\n".join(
                 [
                     "=" * 40,
                     f"We are going on a quest!",
                     f"{quest.num_players} knights will go on this quest",
-                    f"This quest will fail if {quest.required_fails} participants will betray us",
+                    f"This quest will fail if {quest.required_fails} participant{noun_s} betray{verb_s} us",
                 ]
             )
         )
