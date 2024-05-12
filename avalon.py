@@ -13,8 +13,8 @@ from typing import Dict, List, Tuple
 
 
 class _Side(enum.Enum):
-    GOOD = 1
-    EVIL = 2
+    GOOD = "Good"
+    EVIL = "Evil"
 
 
 _Role = collections.namedtuple("_Role", ["key", "name", "side", "know"])
@@ -163,11 +163,6 @@ _rules = {
 _MAX_QUEST_VOTES = 5
 
 
-class QuestResult(enum.Enum):
-    SUCCESS = "succeeded"
-    FAILURE = "failed"
-
-
 class Game:
     def __init__(self, players: List[Player], roles: List[Role]):
         self.players = players
@@ -228,7 +223,7 @@ class Game:
                 )
                 return knights, knight_names
 
-    async def quest(self, quest: _Quest) -> QuestResult:
+    async def quest(self, quest: _Quest) -> _Side:
         noun_s = "s" if quest.required_fails > 1 else ""
         verb_s = "" if quest.required_fails > 1 else "s"
         await self.broadcast(
@@ -279,17 +274,23 @@ class Game:
         else:
             await self.broadcast("None of the knights betrayed us")
         if betrayals >= quest.required_fails:
-            result = QuestResult.FAILURE
+            result = "failed"
+            winner = _Side.EVIL
         else:
-            result = QuestResult.SUCCESS
-        await self.broadcast(f"The quest {result.value}!")
-        return result
+            result = "succeeded"
+            winner = _Side.GOOD
+        await self.broadcast(f"The quest {result}!")
+        return winner
 
     async def play(self) -> None:
         await asyncio.gather(
             *[self.send_initial_info(idx) for idx in range(len(self.player_map))]
         )
-        failures = 0
+        score: Dict[_Side, int] = {s: 0 for s in _Side}
         for quest_idx, quest in enumerate(self.active_rules.quests):
-            result = await self.quest(quest)
-            failures += result is QuestResult.FAILURE
+            winner = await self.quest(quest)
+            score[winner] += 1
+            await self.broadcast(
+                "Current score:\n"
+                + ("\n".join([(s.value + ": " + str(score[s])) for s in _Side]))
+            )
