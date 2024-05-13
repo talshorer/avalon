@@ -79,3 +79,15 @@ class TestAvalon:
         ctr = await game.role_ctr()
         assert ctr[avalon.Role.Minion] == 1
         assert ctr[avalon.Role.Servant] == 1
+
+    @pytest.mark.asyncio
+    async def test_roles(self) -> None:
+        roles = [
+            avalon.Role.Merlin,
+            avalon.Role.Assassin,
+        ]
+        game = Game(roles)
+        await game.play(quests=False)
+        ctr = await game.role_ctr()
+        for role in roles:
+            assert ctr[role] == 1
