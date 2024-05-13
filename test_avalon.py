@@ -264,15 +264,16 @@ class TestAvalon:
 
     async def full_game_test(
         self,
+        roles: List[avalon.Role],
         betray_per_mission: List[bool],
         expected: avalon.Side,
     ) -> None:
-        with self.game([]) as game:
+        with self.game(roles) as game:
             result = await game.run_game(betray_per_mission)
             assert result is expected
 
     async def long_game_test(self, betray: bool, expected: avalon.Side) -> None:
-        await self.full_game_test([True, False, betray], expected)
+        await self.full_game_test([], [True, False, betray], expected)
 
     @pytest.mark.asyncio
     async def test_long_game_good_victory(self) -> None:
@@ -283,7 +284,7 @@ class TestAvalon:
         await self.long_game_test(True, avalon.Side.EVIL)
 
     async def quick_game_test(self, betray: bool, expected: avalon.Side) -> None:
-        await self.full_game_test([betray, betray], expected)
+        await self.full_game_test([], [betray, betray], expected)
 
     @pytest.mark.asyncio
     async def test_quick_game_good_victory(self) -> None:
@@ -292,3 +293,34 @@ class TestAvalon:
     @pytest.mark.asyncio
     async def test_quick_game_evil_victory(self) -> None:
         await self.quick_game_test(True, avalon.Side.EVIL)
+
+    ASSASSIN_TEST_ROLES = [avalon.Role.Merlin, avalon.Role.Assassin]
+
+    async def assassin_test(self, hit: bool, expected: avalon.Side) -> None:
+        with self.game(self.ASSASSIN_TEST_ROLES) as game:
+            map = {await player.get_role(): player for player in game.tplayers}
+            await game.run_quest(False)
+            await game.run_quest(False)
+            assassin = map[avalon.Role.Assassin]
+            merlin = map[avalon.Role.Merlin]
+            await assassin.expect_msg(avalon.ASSASSINATE)
+            murdered = merlin if hit else assassin
+            await assassin.nominate([murdered.name])
+            result = await game.victory()
+            assert result is expected
+
+    @pytest.mark.asyncio
+    async def test_assassin_miss(self) -> None:
+        await self.assassin_test(False, avalon.Side.GOOD)
+
+    @pytest.mark.asyncio
+    async def test_assassin_hit(self) -> None:
+        await self.assassin_test(True, avalon.Side.EVIL)
+
+    @pytest.mark.asyncio
+    async def test_no_assassination_on_evil_win(self) -> None:
+        await self.full_game_test(
+            self.ASSASSIN_TEST_ROLES,
+            [True, True],
+            avalon.Side.EVIL,
+        )

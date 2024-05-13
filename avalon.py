@@ -11,6 +11,8 @@ import itertools
 import random
 from typing import Dict, List, Optional, Tuple
 
+ASSASSINATE = "Select a member of the table to assasinate"
+
 
 def quest_goes(go: bool) -> str:
     return "This quest will {}go forward".format("" if go else "not ")
@@ -316,6 +318,28 @@ class Game:
         await self.broadcast(quest_result(winner))
         return winner
 
+    async def last_ditch_assassination(self) -> bool:
+        def find_player(role: Role) -> Optional[Player]:
+            matches = [player for player, prole in self.player_map if prole is role]
+            if len(matches) == 1:
+                return matches[0]
+            return None
+
+        assassin = find_player(Role.Assassin)
+        merlin = find_player(Role.Merlin)
+        if not assassin or not merlin:
+            return False
+        await self.broadcast(
+            "The forces of evil have one last chance to win by murdering Merlin"
+        )
+        (murdered,) = await self.input_players(assassin, ASSASSINATE, 1)
+        merlin_dead = merlin is murdered
+        yes_or_no = "not " if not merlin_dead else ""
+        await self.broadcast(
+            f"The assassin has murdered {murdered.name}! This is {yes_or_no}Merlin!"
+        )
+        return merlin_dead
+
     async def play(self, quests: bool = True) -> None:
         await asyncio.gather(
             *[self.send_initial_info(idx) for idx in range(len(self.player_map))]
@@ -335,4 +359,7 @@ class Game:
                 break
         else:
             raise ValueError("no victory")
+        if leading_team is Side.GOOD:
+            if await self.last_ditch_assassination():
+                leading_team = Side.EVIL
         await self.broadcast(victory(leading_team))
