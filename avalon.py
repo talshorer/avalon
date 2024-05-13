@@ -33,6 +33,10 @@ def quest_result(side: Side) -> str:
     return f"The quest {result}!"
 
 
+def victory(side: Side) -> str:
+    return f"The {side.value.lower()} team won!"
+
+
 _Role = collections.namedtuple("_Role", ["key", "name", "side", "know"])
 
 
@@ -321,4 +325,4 @@ class Game:
                 break
         else:
             raise ValueError("no victory")
-        await self.broadcast(f"The {leading_team.value.lower()} team won!")
+        await self.broadcast(victory(leading_team))

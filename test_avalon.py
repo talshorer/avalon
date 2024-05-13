@@ -96,6 +96,11 @@ class Player(avalon.Player):
     async def quest_result(self) -> avalon.Side:
         return await self.consume_msg_map(self._QUEST_RESULT)
 
+    _VICTORY = {avalon.victory(s): s for s in avalon.Side}
+
+    async def victory(self) -> avalon.Side:
+        return await self.consume_msg_map(self._VICTORY)
+
     async def expect_msg(self, msg: str) -> None:
         async for s in self.consume_msgs():
             if s == msg:
@@ -173,6 +178,14 @@ class Game(avalon.Game):
         await commander.vote(betray)
         return await self.tplayers[0].quest_result()
 
+    async def victory(self) -> avalon.Side:
+        return await self.tplayers[0].victory()
+
+    async def run_game(self, betray_per_mission: List[bool]) -> avalon.Side:
+        for betray in betray_per_mission:
+            await self.run_quest(betray)
+        return await self.victory()
+
 
 class TestAvalon:
     @pytest.mark.asyncio
@@ -248,3 +261,34 @@ class TestAvalon:
     @pytest.mark.asyncio
     async def test_quest_failure(self) -> None:
         await self.quest_simple_test(True, avalon.Side.EVIL)
+
+    async def full_game_test(
+        self,
+        betray_per_mission: List[bool],
+        expected: avalon.Side,
+    ) -> None:
+        with self.game([]) as game:
+            result = await game.run_game(betray_per_mission)
+            assert result is expected
+
+    async def long_game_test(self, betray: bool, expected: avalon.Side) -> None:
+        await self.full_game_test([True, False, betray], expected)
+
+    @pytest.mark.asyncio
+    async def test_long_game_good_victory(self) -> None:
+        await self.long_game_test(False, avalon.Side.GOOD)
+
+    @pytest.mark.asyncio
+    async def test_long_game_evil_victory(self) -> None:
+        await self.long_game_test(True, avalon.Side.EVIL)
+
+    async def quick_game_test(self, betray: bool, expected: avalon.Side) -> None:
+        await self.full_game_test([betray, betray], expected)
+
+    @pytest.mark.asyncio
+    async def test_quick_game_good_victory(self) -> None:
+        await self.quick_game_test(False, avalon.Side.GOOD)
+
+    @pytest.mark.asyncio
+    async def test_quick_game_evil_victory(self) -> None:
+        await self.quick_game_test(True, avalon.Side.EVIL)
