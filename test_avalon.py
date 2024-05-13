@@ -76,7 +76,7 @@ class Player(avalon.Player):
             r = map.get(s.splitlines()[-1])
             if r is not None:
                 return r
-        assert False, "unreachable"
+        assert False, "unreachable"  # pragma: no cover
 
     _GET_ROLE = {avalon.your_role(role): role for role in avalon.Role}
 
@@ -105,7 +105,7 @@ class Player(avalon.Player):
         async for s in self.consume_msgs():
             if s == msg:
                 return
-        assert False, "unreachable"
+        assert False, "unreachable"  # pragma: no cover
 
     async def nominate(self, value: List[str]) -> None:
         await self.nominate_channel.produce(value)
