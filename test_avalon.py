@@ -205,3 +205,17 @@ class TestAvalon:
     @pytest.mark.asyncio
     async def test_nomination_tie(self) -> None:
         await self.nomination_test(Vote.TIE, False)
+
+    @pytest.mark.asyncio
+    async def test_nomination_retry(self) -> None:
+        with self.game([]) as game:
+            assert not await game.prep_quest(Vote.FALSE)
+            assert await game.prep_quest(Vote.TRUE)
+
+    @pytest.mark.asyncio
+    async def test_nomination_force(self) -> None:
+        with self.game([]) as game:
+            for _ in range(avalon.MAX_QUEST_VOTES):
+                assert not await game.prep_quest(Vote.FALSE)
+            commander = await game.prep_nomination()
+            await game.tplayers[0].expect_msg(avalon.going_on_a_quest(commander.name))

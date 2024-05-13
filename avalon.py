@@ -16,6 +16,10 @@ def quest_goes(go: bool) -> str:
     return "This quest will {}go forward".format("" if go else "not ")
 
 
+def going_on_a_quest(knight_names: str) -> str:
+    return f"{knight_names} are going on a quest!"
+
+
 class _Side(enum.Enum):
     GOOD = "Good"
     EVIL = "Evil"
@@ -168,7 +172,7 @@ _default_rules = {
     ),
 }
 
-_MAX_QUEST_VOTES = 5
+MAX_QUEST_VOTES = 4
 
 
 class Game:
@@ -247,7 +251,7 @@ class Game:
             )
         )
 
-        for itry in range(_MAX_QUEST_VOTES - 1):
+        for itry in range(MAX_QUEST_VOTES):
             await self.broadcast(f"Vote #{itry+1} will begin shortly")
             knights, knight_names = await self.nominate(quest)
             go_vote = await self.vote(
@@ -275,7 +279,7 @@ class Game:
             )
             knights, knight_names = await self.nominate(quest)
 
-        await self.broadcast(f"{knight_names} are going on a quest!")
+        await self.broadcast(going_on_a_quest(knight_names))
         quest_vote = await self.vote("Betray the quest?", knights)
         ctr = collections.Counter(quest_vote.values())
         betrayals = ctr[True]
