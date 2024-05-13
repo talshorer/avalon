@@ -12,6 +12,10 @@ import random
 from typing import Dict, List, Optional, Tuple
 
 
+def quest_goes(go: bool) -> str:
+    return "This quest will {}go forward".format("" if go else "not ")
+
+
 class _Side(enum.Enum):
     GOOD = "Good"
     EVIL = "Evil"
@@ -259,7 +263,7 @@ class Game:
                             k + ": " + ("aye" if v else "nay")
                             for k, v in go_vote.items()
                         ],
-                        "This quest will {}go forward".format("" if go else "not "),
+                        quest_goes(go),
                     ]
                 )
             )
