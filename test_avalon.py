@@ -336,3 +336,9 @@ class TestAvalon:
     @pytest.mark.asyncio
     async def test_too_many_evil_roles(self) -> None:
         await self.too_many_roles_test(avalon.Role.Assassin)
+
+    @pytest.mark.asyncio
+    async def test_broken_rules(self) -> None:
+        game = avalon.Game([], [], avalon.Rules(0, []))
+        with pytest.raises(ValueError):
+            await game.play()
