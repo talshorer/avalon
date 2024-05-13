@@ -71,6 +71,10 @@ class Role(enum.Enum):
     )
 
 
+def your_role(role: Role) -> str:
+    return f"Your role is {role.value.name}"
+
+
 class Player(abc.ABC):
     def __init__(self, name: str):
         self.name = name
@@ -86,76 +90,76 @@ class Player(abc.ABC):
 
 
 @dataclasses.dataclass
-class _Quest:
+class Quest:
     num_players: int
     required_fails: int
 
 
 @dataclasses.dataclass
-class _Rules:
+class Rules:
     total_evil: int
-    quests: List[_Quest]
+    quests: List[Quest]
 
 
-_rules = {
-    5: _Rules(
+_default_rules = {
+    5: Rules(
         2,
         [
-            _Quest(2, 1),
-            _Quest(3, 1),
-            _Quest(2, 1),
-            _Quest(3, 1),
-            _Quest(3, 1),
+            Quest(2, 1),
+            Quest(3, 1),
+            Quest(2, 1),
+            Quest(3, 1),
+            Quest(3, 1),
         ],
     ),
-    6: _Rules(
+    6: Rules(
         2,
         [
-            _Quest(2, 1),
-            _Quest(3, 1),
-            _Quest(4, 1),
-            _Quest(3, 1),
-            _Quest(4, 1),
+            Quest(2, 1),
+            Quest(3, 1),
+            Quest(4, 1),
+            Quest(3, 1),
+            Quest(4, 1),
         ],
     ),
-    7: _Rules(
+    7: Rules(
         3,
         [
-            _Quest(2, 1),
-            _Quest(3, 1),
-            _Quest(3, 1),
-            _Quest(4, 2),
-            _Quest(4, 1),
+            Quest(2, 1),
+            Quest(3, 1),
+            Quest(3, 1),
+            Quest(4, 2),
+            Quest(4, 1),
         ],
     ),
-    8: _Rules(
+    8: Rules(
         3,
         [
-            _Quest(3, 1),
-            _Quest(4, 1),
-            _Quest(4, 1),
-            _Quest(5, 2),
-            _Quest(5, 1),
+            Quest(3, 1),
+            Quest(4, 1),
+            Quest(4, 1),
+            Quest(5, 2),
+            Quest(5, 1),
         ],
     ),
-    9: _Rules(
+    9: Rules(
         3,
         [
-            _Quest(3, 1),
-            _Quest(4, 1),
-            _Quest(4, 1),
-            _Quest(5, 2),
-            _Quest(5, 1),
+            Quest(3, 1),
+            Quest(4, 1),
+            Quest(4, 1),
+            Quest(5, 2),
+            Quest(5, 1),
         ],
     ),
-    10: _Rules(
+    10: Rules(
         4,
         [
-            _Quest(3, 1),
-            _Quest(4, 1),
-            _Quest(4, 1),
-            _Quest(5, 2),
-            _Quest(5, 1),
+            Quest(3, 1),
+            Quest(4, 1),
+            Quest(4, 1),
+            Quest(5, 2),
+            Quest(5, 1),
         ],
     ),
 }
@@ -164,10 +168,12 @@ _MAX_QUEST_VOTES = 5
 
 
 class Game:
-    def __init__(self, players: List[Player], roles: List[Role]):
+    def __init__(
+        self, players: List[Player], roles: List[Role], rules: Optional[Rules] = None
+    ):
         self.players = players
         self.roles = roles
-        self.active_rules = _rules[len(players)]
+        self.active_rules = rules or _default_rules[len(players)]
         evils = self.active_rules.total_evil
         goods = len(players) - evils
         evil_roles = [r for r in roles if r.value.side == _Side.EVIL]
@@ -196,7 +202,7 @@ class Game:
     async def send_initial_info(self, idx: int) -> None:
         player, role = self.player_map[idx]
         await player.send(f"Welcome to Avalon, {player.name}!")
-        await player.send(f"Your role is {role.value.name}")
+        await player.send(your_role(role))
         know = []
         for other_player, other_role in self.player_map:
             if other_player is player:
@@ -207,7 +213,7 @@ class Game:
             await player.send("Here are the players you should know about:")
             await player.send(" ".join(know))
 
-    async def nominate(self, quest: _Quest) -> Tuple[List[Player], str]:
+    async def nominate(self, quest: Quest) -> Tuple[List[Player], str]:
         commander = next(self.commander_order)
         await self.broadcast(f"The residing lord commander is {commander.name}")
         while True:
@@ -223,7 +229,7 @@ class Game:
                 )
                 return knights, knight_names
 
-    async def quest(self, quest: _Quest) -> _Side:
+    async def quest(self, quest: Quest) -> _Side:
         noun_s = "s" if quest.required_fails > 1 else ""
         verb_s = "" if quest.required_fails > 1 else "s"
         await self.broadcast(
@@ -282,10 +288,12 @@ class Game:
         await self.broadcast(f"The quest {result}!")
         return winner
 
-    async def play(self) -> None:
+    async def play(self, quests: bool = True) -> None:
         await asyncio.gather(
             *[self.send_initial_info(idx) for idx in range(len(self.player_map))]
         )
+        if not quests:
+            return
         score: Dict[_Side, int] = {s: 0 for s in _Side}
         for quest_idx, quest in enumerate(self.active_rules.quests):
             winner = await self.quest(quest)
