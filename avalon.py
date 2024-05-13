@@ -233,21 +233,31 @@ class Game:
             await player.send("Here are the players you should know about:")
             await player.send(" ".join(know))
 
+    async def input_players(
+        self,
+        selector: Player,
+        msg: str,
+        count: int,
+    ) -> List[Player]:
+        group = await selector.input_players(msg, count)
+        assert len(group) == count
+        knights = [player for player in self.players if player.name in group]
+        assert len(knights) == count
+        return knights
+
     async def nominate(self, quest: Quest) -> Tuple[List[Player], str]:
         commander = next(self.commander_order)
         await self.broadcast(f"The residing lord commander is {commander.name}")
-        while True:
-            nomination = await commander.input_players(
-                f"Lord commander! Select {quest.num_players} knights to go on this quest!",
-                quest.num_players,
-            )
-            knights = [player for player in self.players if player.name in nomination]
-            if len(knights) == quest.num_players:
-                knight_names = " ".join([k.name for k in knights])
-                await self.broadcast(
-                    f"The lord commander nominates {knight_names} for this quest!"
-                )
-                return knights, knight_names
+        knights = await self.input_players(
+            commander,
+            f"Lord commander! Select {quest.num_players} knights to go on this quest!",
+            quest.num_players,
+        )
+        knight_names = " ".join([k.name for k in knights])
+        await self.broadcast(
+            f"The lord commander nominates {knight_names} for this quest!"
+        )
+        return knights, knight_names
 
     async def quest(self, quest: Quest) -> Side:
         noun_s = "s" if quest.required_fails > 1 else ""
