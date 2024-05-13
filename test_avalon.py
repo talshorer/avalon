@@ -14,6 +14,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Tuple,
     TypeVar,
 )
 
@@ -90,6 +91,11 @@ class Player(avalon.Player):
     async def quest_goes(self) -> bool:
         return await self.consume_msg_map(self._QUEST_GOES)
 
+    _QUEST_RESULT = {avalon.quest_result(s): s for s in avalon.Side}
+
+    async def quest_result(self) -> avalon.Side:
+        return await self.consume_msg_map(self._QUEST_RESULT)
+
     async def expect_msg(self, msg: str) -> None:
         async for s in self.consume_msgs():
             if s == msg:
@@ -152,10 +158,20 @@ class Game(avalon.Game):
         await commander.nominate([commander.name])
         return commander
 
-    async def prep_quest(self, vote: Vote) -> bool:
-        await self.prep_nomination()
+    async def _prep_quest(self, vote: Vote) -> Tuple[bool, Player]:
+        commander = await self.prep_nomination()
         await self.submit_votes(vote)
-        return await self.tplayers[0].quest_goes()
+        goes = await self.tplayers[0].quest_goes()
+        return goes, commander
+
+    async def prep_quest(self, vote: Vote) -> bool:
+        goes, _ = await self._prep_quest(vote)
+        return goes
+
+    async def run_quest(self, betray: bool) -> avalon.Side:
+        _, commander = await self._prep_quest(Vote.TRUE)
+        await commander.vote(betray)
+        return await self.tplayers[0].quest_result()
 
 
 class TestAvalon:
@@ -219,3 +235,16 @@ class TestAvalon:
                 assert not await game.prep_quest(Vote.FALSE)
             commander = await game.prep_nomination()
             await game.tplayers[0].expect_msg(avalon.going_on_a_quest(commander.name))
+
+    async def quest_simple_test(self, betray: bool, expected: avalon.Side) -> None:
+        with self.game([]) as game:
+            result = await game.run_quest(betray)
+            assert result is expected
+
+    @pytest.mark.asyncio
+    async def test_quest_success(self) -> None:
+        await self.quest_simple_test(False, avalon.Side.GOOD)
+
+    @pytest.mark.asyncio
+    async def test_quest_failure(self) -> None:
+        await self.quest_simple_test(True, avalon.Side.EVIL)

@@ -20,9 +20,17 @@ def going_on_a_quest(knight_names: str) -> str:
     return f"{knight_names} are going on a quest!"
 
 
-class _Side(enum.Enum):
+class Side(enum.Enum):
     GOOD = "Good"
     EVIL = "Evil"
+
+
+def quest_result(side: Side) -> str:
+    if side is Side.GOOD:
+        result = "succeeded"
+    else:
+        result = "failed"
+    return f"The quest {result}!"
 
 
 _Role = collections.namedtuple("_Role", ["key", "name", "side", "know"])
@@ -32,49 +40,49 @@ class Role(enum.Enum):
     Minion = _Role(
         key="Minion",
         name="Minion of Mordred",
-        side=_Side.EVIL,
+        side=Side.EVIL,
         know=("Minion", "Mordred", "Morgana", "Assassin"),
     )
     Servant = _Role(
         key="Servant",
         name="Servant of Arthur",
-        side=_Side.GOOD,
+        side=Side.GOOD,
         know=(),
     )
     Merlin = _Role(
         key="Merlin",
         name="Merlin",
-        side=_Side.GOOD,
+        side=Side.GOOD,
         know=("Minion", "Morgana", "Assassin", "Oberon"),
     )
     Mordred = _Role(
         key="Mordred",
         name="Mordred",
-        side=_Side.EVIL,
+        side=Side.EVIL,
         know=("Minion", "Mordred", "Morgana", "Assassin"),
     )
     Morgana = _Role(
         key="Morgana",
         name="Morgana",
-        side=_Side.EVIL,
+        side=Side.EVIL,
         know=("Minion", "Mordred", "Morgana", "Assassin"),
     )
     Percival = _Role(
         key="Percival",
         name="Percival",
-        side=_Side.GOOD,
+        side=Side.GOOD,
         know=("Merlin", "Morgana"),
     )
     Assassin = _Role(
         key="Assassin",
         name="Assassin",
-        side=_Side.EVIL,
+        side=Side.EVIL,
         know=("Minion", "Mordred", "Morgana", "Assassin"),
     )
     Oberon = _Role(
         key="Oberon",
         name="Oberon",
-        side=_Side.EVIL,
+        side=Side.EVIL,
         know=(),
     )
 
@@ -184,8 +192,8 @@ class Game:
         self.active_rules = rules or _default_rules[len(players)]
         evils = self.active_rules.total_evil
         goods = len(players) - evils
-        evil_roles = [r for r in roles if r.value.side == _Side.EVIL]
-        good_roles = [r for r in roles if r.value.side == _Side.GOOD]
+        evil_roles = [r for r in roles if r.value.side == Side.EVIL]
+        good_roles = [r for r in roles if r.value.side == Side.GOOD]
         if len(evil_roles) > evils:
             raise ValueError("Too many evil roles")
         if len(good_roles) > goods:
@@ -237,7 +245,7 @@ class Game:
                 )
                 return knights, knight_names
 
-    async def quest(self, quest: Quest) -> _Side:
+    async def quest(self, quest: Quest) -> Side:
         noun_s = "s" if quest.required_fails > 1 else ""
         verb_s = "" if quest.required_fails > 1 else "s"
         await self.broadcast(
@@ -288,12 +296,10 @@ class Game:
         else:
             await self.broadcast("None of the knights betrayed us")
         if betrayals >= quest.required_fails:
-            result = "failed"
-            winner = _Side.EVIL
+            winner = Side.EVIL
         else:
-            result = "succeeded"
-            winner = _Side.GOOD
-        await self.broadcast(f"The quest {result}!")
+            winner = Side.GOOD
+        await self.broadcast(quest_result(winner))
         return winner
 
     async def play(self, quests: bool = True) -> None:
@@ -302,13 +308,13 @@ class Game:
         )
         if not quests:
             return
-        score: Dict[_Side, int] = {s: 0 for s in _Side}
+        score: Dict[Side, int] = {s: 0 for s in Side}
         for quest_idx, quest in enumerate(self.active_rules.quests):
             winner = await self.quest(quest)
             score[winner] += 1
             await self.broadcast(
                 "Current score:\n"
-                + ("\n".join([(s.value + ": " + str(score[s])) for s in _Side]))
+                + ("\n".join([(s.value + ": " + str(score[s])) for s in Side]))
             )
             (leading_team, nr_wins) = max(score.items(), key=lambda item: item[1])
             if nr_wins > len(self.active_rules.quests) // 2:
