@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import enum
 import os
+import traceback
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 import discord
@@ -167,7 +168,11 @@ class Client(discord.Client):
             for player in players:
                 assert isinstance(player, DiscordPlayer)
                 player.set_options(options)
-            await avalon.Game(players, roles).play()
+            try:
+                await avalon.Game(players, roles).play()
+            except Exception:
+                tb = traceback.format_exc()
+                await message.channel.send(f"The kingdom has fallen!\n```{tb}```")
 
     async def on_interaction(self, interaction: discord.Interaction) -> None:
         waiter = self.waiters.pop(self.to_mention(interaction.user), None)
