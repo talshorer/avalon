@@ -169,7 +169,9 @@ class Client(discord.Client):
                 if (flag := self.get_flag(part)) is not None:
                     flags.add(flag)
                     continue
-                await message.channel.send(f"Sorry, don't know what to do with {part}")
+                await message.channel.send(
+                    f"Sorry, don't know what to do with `{part}`"
+                )
                 return
             options = [NominationOption(player) for player in players]
             for player in players:
