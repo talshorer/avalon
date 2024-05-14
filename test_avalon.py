@@ -131,7 +131,6 @@ class Vote(enum.Enum):
 
 
 class Game(avalon.Game):
-
     def __init__(
         self,
         roles: List[avalon.Role],
@@ -214,8 +213,10 @@ class TestAvalon:
 
     @staticmethod
     @contextlib.contextmanager
-    def game(roles: List[avalon.Role]) -> Iterator[Game]:
-        game = Game(roles)
+    def game(
+        roles: List[avalon.Role], flags: Optional[Set[avalon.Flag]] = None
+    ) -> Iterator[Game]:
+        game = Game(roles, flags)
         task = asyncio.create_task(game.play())
         try:
             yield game
@@ -343,6 +344,17 @@ class TestAvalon:
 
     @pytest.mark.asyncio
     async def test_broken_rules(self) -> None:
-        game = avalon.Game([], [], set(), avalon.Rules(0, []))
+        game = avalon.Game([Player("p0")], [], set(), avalon.Rules(0, []))
         with pytest.raises(ValueError):
             await game.play()
+
+    @pytest.mark.asyncio
+    async def test_lady_of_the_lake(self) -> None:
+        with self.game([], {avalon.Flag.Lady}) as game:
+            p0, p1 = game.tplayers
+            role = await p0.get_role()
+            await game.run_quest(False)
+            await game.run_quest(True)
+            # score is now 1:1, game continues, lady triggers after second quest
+            await p1.nominate([p0.name])
+            await p1.expect_msg(avalon.lady_reveal(p0.name, role.value.side))

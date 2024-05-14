@@ -9,7 +9,7 @@ import dataclasses
 import enum
 import itertools
 import random
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 ASSASSINATE = "Select a member of the table to assasinate"
 
@@ -39,7 +39,16 @@ def victory(side: Side) -> str:
     return f"The {side.value.lower()} team won!"
 
 
-_Role = collections.namedtuple("_Role", ["key", "name", "side", "know"])
+def lady_reveal(name: str, side: Side) -> str:
+    return f"The Lady of the Lake reveals that {name} is {side.name.lower()}"
+
+
+@dataclasses.dataclass
+class _Role:
+    key: str
+    name: str
+    side: Side
+    know: Iterable[str]
 
 
 class Role(enum.Enum):
@@ -95,6 +104,7 @@ class Role(enum.Enum):
 
 class Flag(enum.Enum):
     NoQuests = 1
+    Lady = 2
 
 
 def your_role(role: Role) -> str:
@@ -191,6 +201,7 @@ _default_rules = {
 }
 
 MAX_QUEST_VOTES = 4
+LADY_BEGINS_AFTER = 1
 
 
 class Game:
@@ -207,6 +218,7 @@ class Game:
         if flags is None:
             flags = set()
         self.flags = flags
+        self.next_lady_target = players[-1]
         evils = self.active_rules.total_evil
         goods = len(players) - evils
         evil_roles = [r for r in roles if r.value.side == Side.EVIL]
@@ -329,6 +341,21 @@ class Game:
         await self.broadcast(quest_result(winner))
         return winner
 
+    async def lady_of_the_lake(self) -> None:
+        target = self.next_lady_target
+        await self.broadcast(f"The lady of the Lake visits {target.name}")
+        (chosen,) = await self.input_players(
+            target,
+            "Whose allegiance would you like the Lady of the Lake to reveal?",
+            1,
+        )
+        (role,) = [role for player, role in self.player_map if player is chosen]
+        await target.send(lady_reveal(chosen.name, role.value.side))
+        await self.broadcast(
+            f"The Lady of the Lake revealed the allegiance of {chosen.name} to {target.name}"
+        )
+        self.next_lady_target = chosen
+
     async def last_ditch_assassination(self) -> bool:
         def find_player(role: Role) -> Optional[Player]:
             matches = [player for player, prole in self.player_map if prole is role]
@@ -368,6 +395,8 @@ class Game:
             (leading_team, nr_wins) = max(score.items(), key=lambda item: item[1])
             if nr_wins > len(self.active_rules.quests) // 2:
                 break
+            if Flag.Lady in self.flags and quest_idx >= LADY_BEGINS_AFTER:
+                await self.lady_of_the_lake()
         else:
             raise ValueError("no victory")
         if leading_team is Side.GOOD:
