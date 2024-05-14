@@ -83,7 +83,7 @@ class Player(avalon.Player):
                 return r
         assert False, "unreachable"  # pragma: no cover
 
-    _GET_ROLE = {avalon.your_role(role): role for role in avalon.Role}
+    _GET_ROLE = {avalon.Game.your_role(role): role for role in avalon.Role}
 
     async def get_role(self) -> avalon.Role:
         if self.role is None:
@@ -96,12 +96,12 @@ class Player(avalon.Player):
     async def quest_goes(self) -> bool:
         return await self.consume_msg_map(self._QUEST_GOES)
 
-    _QUEST_RESULT = {avalon.quest_result(s): s for s in avalon.Side}
+    _QUEST_RESULT = {avalon.Game.quest_result(s): s for s in avalon.Side}
 
     async def quest_result(self) -> avalon.Side:
         return await self.consume_msg_map(self._QUEST_RESULT)
 
-    _VICTORY = {avalon.victory(s): s for s in avalon.Side}
+    _VICTORY = {avalon.Game.victory(s): s for s in avalon.Side}
 
     async def victory(self) -> avalon.Side:
         return await self.consume_msg_map(self._VICTORY)
@@ -186,13 +186,13 @@ class Game(avalon.Game):
         await commander.vote(betray)
         return await self.tplayers[0].quest_result()
 
-    async def victory(self) -> avalon.Side:
+    async def get_victory(self) -> avalon.Side:
         return await self.tplayers[0].victory()
 
     async def run_game(self, betray_per_mission: List[bool]) -> avalon.Side:
         for betray in betray_per_mission:
             await self.run_quest(betray)
-        return await self.victory()
+        return await self.get_victory()
 
 
 class TestAvalon:
@@ -316,7 +316,7 @@ class TestAvalon:
             await assassin.expect_msg(avalon.ASSASSINATE)
             murdered = merlin if hit else assassin
             await assassin.nominate([murdered.name])
-            result = await game.victory()
+            result = await game.get_victory()
             assert result is expected
 
     @pytest.mark.asyncio
@@ -362,4 +362,4 @@ class TestAvalon:
             await game.run_quest(True)
             # score is now 1:1, game continues, lady triggers after second quest
             await p1.nominate([p0.name])
-            await p1.expect_msg(avalon.lady_reveal(p0.name, role.value.side))
+            await p1.expect_msg(avalon.Game.lady_reveal(p0.name, role.value.side))

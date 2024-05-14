@@ -125,6 +125,12 @@ class DiscordPlayer(avalon.Player):
         await self.member.send(msg)
 
 
+class DiscordGame(avalon.Game):
+    @staticmethod
+    def bold(s: str) -> str:
+        return f"**{s}**"
+
+
 class Client(discord.Client):
     def __init__(self, summon: str) -> None:
         super().__init__(
@@ -191,7 +197,7 @@ class Client(discord.Client):
                 assert isinstance(player, DiscordPlayer)
                 player.set_options(options)
             try:
-                await avalon.Game(players, roles, flags).play()
+                await DiscordGame(players, roles, flags).play()
             except Exception:
                 tb = traceback.format_exc()
                 await message.channel.send(f"The kingdom has fallen!\n```{tb}```")

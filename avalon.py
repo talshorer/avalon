@@ -27,22 +27,6 @@ class Side(enum.Enum):
     EVIL = "Evil"
 
 
-def quest_result(side: Side) -> str:
-    if side is Side.GOOD:
-        result = "succeeded"
-    else:
-        result = "failed"
-    return f"The quest {result}!"
-
-
-def victory(side: Side) -> str:
-    return f"The {side.value.lower()} team won!"
-
-
-def lady_reveal(name: str, side: Side) -> str:
-    return f"The Lady of the Lake reveals that {name} is {side.name.lower()}"
-
-
 @dataclasses.dataclass
 class _Role:
     key: str
@@ -105,10 +89,6 @@ class Role(enum.Enum):
 class Flag(enum.Enum):
     NoQuests = 1
     Lady = 2
-
-
-def your_role(role: Role) -> str:
-    return f"Your role is {role.value.name}"
 
 
 class Player(abc.ABC):
@@ -244,6 +224,32 @@ class Game:
         self.next_lady_target = player
         self.lady_excludes.add(player.name)
 
+    @staticmethod
+    def bold(s: str) -> str:
+        return s
+
+    @classmethod
+    def quest_result(cls, side: Side) -> str:
+        if side is Side.GOOD:
+            result = "succeeded"
+        else:
+            result = "failed"
+        return f"The quest {cls.bold(result)}!"
+
+    @classmethod
+    def victory(cls, side: Side) -> str:
+        return f"The {cls.bold(side.value.lower())} team wins!"
+
+    @classmethod
+    def lady_reveal(cls, name: str, side: Side) -> str:
+        return (
+            f"The Lady of the Lake reveals that {name} is {cls.bold(side.name.lower())}"
+        )
+
+    @classmethod
+    def your_role(cls, role: Role) -> str:
+        return f"Your role is {cls.bold(role.value.name)}"
+
     async def broadcast(self, msg: str) -> None:
         await asyncio.gather(*[player.send(msg) for player in self.players])
 
@@ -257,7 +263,7 @@ class Game:
     async def send_initial_info(self, idx: int) -> None:
         player, role = self.player_map[idx]
         await player.send(f"Welcome to Avalon, {player.name}!")
-        await player.send(your_role(role))
+        await player.send(self.your_role(role))
         know = []
         for other_player, other_role in self.player_map:
             if other_player is player:
@@ -283,12 +289,21 @@ class Game:
         assert len(knights) == count
         return knights
 
+    _num_to_word = {
+        1: "one",
+        2: "two",
+        3: "three",
+        4: "four",
+        5: "five",
+    }
+
     async def nominate(self, quest: Quest) -> Tuple[List[Player], str]:
         commander = next(self.commander_order)
         await self.broadcast(f"The residing lord commander is {commander.name}")
+        how_many = self.bold(f"{self._num_to_word[quest.num_players]} knights")
         knights = await self.input_players(
             commander,
-            f"Lord commander! Select {quest.num_players} knights to go on this quest!",
+            f"Lord commander! Select {how_many} to go on this quest!",
             quest.num_players,
             None,
         )
@@ -298,22 +313,44 @@ class Game:
         )
         return knights, knight_names
 
+    @staticmethod
+    def capitalize(s: str) -> str:
+        return s[0].upper() + s[1:]
+
+    _num_to_ordinal = {
+        1: "first",
+        2: "second",
+        3: "third",
+        4: "fourth",
+    }
+
+    @staticmethod
+    def knight_s(n: int) -> str:
+        return "knight" + ("s" if n > 1 else "")
+
     async def quest(self, quest: Quest) -> Side:
-        noun_s = "s" if quest.required_fails > 1 else ""
         verb_s = "" if quest.required_fails > 1 else "s"
+        to_go = self.bold(
+            f"{self.capitalize(self._num_to_word[quest.num_players])} knights"
+        )
+        to_betray = self.bold(
+            f"{self._num_to_word[quest.required_fails]} {self.knight_s(quest.required_fails)} "
+        )
         await self.broadcast(
             "\n".join(
                 [
                     "=" * 40,
                     "We are going on a quest!",
-                    f"{quest.num_players} knights will go on this quest",
-                    f"This quest will fail if {quest.required_fails} participant{noun_s} betray{verb_s} us",
+                    f"{to_go} will go on this quest",
+                    f"This quest will fail if {to_betray} betray{verb_s} us",
                 ]
             )
         )
 
         for itry in range(MAX_QUEST_VOTES):
-            await self.broadcast(f"Vote #{itry+1} will begin shortly")
+            await self.broadcast(
+                f"The {self.bold(self._num_to_ordinal[itry+1])} vote for this quest will begin shortly"
+            )
             knights, knight_names = await self.nominate(quest)
             go_vote = await self.vote(
                 f"Should {knight_names} go on a quest?", self.players
@@ -325,7 +362,7 @@ class Game:
                     [
                         "The table voted thus:",
                         *[
-                            k + ": " + ("aye" if v else "nay")
+                            k + ": " + self.bold("aye" if v else "nay")
                             for k, v in go_vote.items()
                         ],
                         quest_goes(go),
@@ -345,14 +382,18 @@ class Game:
         ctr = collections.Counter(quest_vote.values())
         betrayals = ctr[True]
         if betrayals:
-            await self.broadcast(f"We have been betrayed by {betrayals} knights")
+            how_many = self.bold(
+                f"{self._num_to_word[betrayals]} {self.knight_s(betrayals)}"
+            )
+            await self.broadcast(f"We have been betrayed by {how_many}")
         else:
-            await self.broadcast("None of the knights betrayed us")
+            none = self.bold("None")
+            await self.broadcast(f"{none} of the knights betrayed us")
         if betrayals >= quest.required_fails:
             winner = Side.EVIL
         else:
             winner = Side.GOOD
-        await self.broadcast(quest_result(winner))
+        await self.broadcast(self.quest_result(winner))
         return winner
 
     async def lady_of_the_lake(self) -> None:
@@ -365,7 +406,7 @@ class Game:
             self.lady_excludes,
         )
         (role,) = [role for player, role in self.player_map if player is chosen]
-        await target.send(lady_reveal(chosen.name, role.value.side))
+        await target.send(self.lady_reveal(chosen.name, role.value.side))
         await self.broadcast(
             f"The Lady of the Lake revealed the allegiance of {chosen.name} to {target.name}"
         )
@@ -388,8 +429,9 @@ class Game:
         (murdered,) = await self.input_players(assassin, ASSASSINATE, 1, None)
         merlin_dead = merlin is murdered
         yes_or_no = "not " if not merlin_dead else ""
+        this_is_merlin = self.bold(f"This is {yes_or_no}Merlin!")
         await self.broadcast(
-            f"The assassin has murdered {murdered.name}! This is {yes_or_no}Merlin!"
+            f"The assassin has murdered {murdered.name}! {this_is_merlin}"
         )
         return merlin_dead
 
@@ -405,7 +447,7 @@ class Game:
             score[winner] += 1
             await self.broadcast(
                 "Current score:\n"
-                + ("\n".join([(s.value + ": " + str(score[s])) for s in Side]))
+                + ("\n".join([self.bold(s.value + ": " + str(score[s])) for s in Side]))
             )
             (leading_team, nr_wins) = max(score.items(), key=lambda item: item[1])
             if nr_wins > len(self.active_rules.quests) // 2:
@@ -417,4 +459,4 @@ class Game:
         if leading_team is Side.GOOD:
             if await self.last_ditch_assassination():
                 leading_team = Side.EVIL
-        await self.broadcast(victory(leading_team))
+        await self.broadcast(self.victory(leading_team))
