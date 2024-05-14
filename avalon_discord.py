@@ -12,7 +12,6 @@ from typing_extensions import ParamSpec
 
 import avalon
 
-
 Member = Union[discord.User, discord.Member]
 
 
@@ -21,28 +20,22 @@ class NominationOption:
         assert isinstance(player, DiscordPlayer)
         self.nick = getattr(player.member, "nick", "")
         self.name = player.member.name
-        self.mention = to_mention(player.member)
-
-
-waiters: Dict[str, "asyncio.Future[discord.Interaction]"] = {}
-
-
-def to_mention(member: Member) -> str:
-    return f"<@{member.id}>"
+        self.mention = player.client.to_mention(player.member)
 
 
 class DiscordPlayer(avalon.Player):
-    def __init__(self, member: Member):
+    def __init__(self, member: Member, client: "Client"):
         self.member = member
         self.options: List[NominationOption] = []
-        super().__init__(to_mention(member))
+        self.client = client
+        super().__init__(self.client.to_mention(member))
 
     def set_options(self, options: List[NominationOption]) -> None:
         self.options = options
 
     async def interact(self, aw: Awaitable[Any]) -> discord.Interaction:
         fut: asyncio.Future[discord.Interaction] = asyncio.Future()
-        waiters[self.name] = fut
+        self.client.waiters[self.name] = fut
         await asyncio.gather(aw, fut)
         return fut.result()
 
@@ -120,19 +113,6 @@ class DiscordPlayer(avalon.Player):
         await self.member.send(msg)
 
 
-def get_member(part: str, mentions: List[Member]) -> Optional[Member]:
-    for member in mentions:
-        if part == to_mention(member):
-            return member
-    return None
-
-
-def get_role(part: str) -> Optional[avalon.Role]:
-    for role in avalon.Role:
-        if part == role.value.key:
-            return role
-    return None
-
 class Client(discord.Client):
     def __init__(self) -> None:
         super().__init__(
@@ -142,6 +122,24 @@ class Client(discord.Client):
                 guilds=True,
             ),
         )
+        self.waiters: Dict[str, "asyncio.Future[discord.Interaction]"] = {}
+
+    @staticmethod
+    def to_mention(member: Member) -> str:
+        return f"<@{member.id}>"
+
+    def get_member(self, part: str, mentions: List[Member]) -> Optional[Member]:
+        for member in mentions:
+            if part == self.to_mention(member):
+                return member
+        return None
+
+    @staticmethod
+    def get_role(part: str) -> Optional[avalon.Role]:
+        for role in avalon.Role:
+            if part == role.value.key:
+                return role
+        return None
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author == self.user:
@@ -155,11 +153,11 @@ class Client(discord.Client):
             players: List[avalon.Player] = []
             roles = []
             for part in content.split()[1:]:
-                member = get_member(part, message.mentions)
+                member = self.get_member(part, message.mentions)
                 if member is not None:
-                    players.append(DiscordPlayer(member))
+                    players.append(DiscordPlayer(member, self))
                     continue
-                role = get_role(part)
+                role = self.get_role(part)
                 if role is not None:
                     roles.append(role)
                     continue
@@ -171,14 +169,14 @@ class Client(discord.Client):
                 player.set_options(options)
             await avalon.Game(players, roles).play()
 
-
     async def on_interaction(self, interaction: discord.Interaction) -> None:
-        waiter = waiters.pop(to_mention(interaction.user), None)
+        waiter = self.waiters.pop(self.to_mention(interaction.user), None)
         if waiter is not None:
             waiter.set_result(interaction)
 
-
-    async def on_ready(self, ) -> None:
+    async def on_ready(
+        self,
+    ) -> None:
         assert self.user is not None
         print(f"{self.user.name} has connected to Discord!")
 
