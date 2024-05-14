@@ -4,7 +4,7 @@ import asyncio
 import enum
 import os
 import traceback
-from typing import Any, Awaitable, Dict, List, Optional, Union
+from typing import Any, Awaitable, Dict, List, Optional, Set, Union
 
 import discord
 import dotenv
@@ -140,6 +140,13 @@ class Client(discord.Client):
                 return role
         return None
 
+    @staticmethod
+    def get_flag(part: str) -> Optional[avalon.Flag]:
+        for flag in avalon.Flag:
+            if part == flag.name:
+                return flag
+        return None
+
     async def on_message(self, message: discord.Message) -> None:
         if message.author == self.user:
             return
@@ -151,12 +158,16 @@ class Client(discord.Client):
             print(f"Content: {content}")
             players: List[avalon.Player] = []
             roles = []
+            flags: Set[avalon.Flag] = set()
             for part in content.split()[1:]:
                 if (member := self.get_member(part, message.mentions)) is not None:
                     players.append(DiscordPlayer(member, self))
                     continue
                 if (role := self.get_role(part)) is not None:
                     roles.append(role)
+                    continue
+                if (flag := self.get_flag(part)) is not None:
+                    flags.add(flag)
                     continue
                 await message.channel.send(f"Sorry, don't know what to do with {part}")
                 return
@@ -165,7 +176,7 @@ class Client(discord.Client):
                 assert isinstance(player, DiscordPlayer)
                 player.set_options(options)
             try:
-                await avalon.Game(players, roles).play()
+                await avalon.Game(players, roles, flags).play()
             except Exception:
                 tb = traceback.format_exc()
                 await message.channel.send(f"The kingdom has fallen!\n```{tb}```")

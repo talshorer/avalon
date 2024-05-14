@@ -9,7 +9,7 @@ import dataclasses
 import enum
 import itertools
 import random
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 ASSASSINATE = "Select a member of the table to assasinate"
 
@@ -91,6 +91,10 @@ class Role(enum.Enum):
         side=Side.EVIL,
         know=(),
     )
+
+
+class Flag(enum.Enum):
+    NoQuests = 1
 
 
 def your_role(role: Role) -> str:
@@ -191,11 +195,18 @@ MAX_QUEST_VOTES = 4
 
 class Game:
     def __init__(
-        self, players: List[Player], roles: List[Role], rules: Optional[Rules] = None
+        self,
+        players: List[Player],
+        roles: List[Role],
+        flags: Optional[Set[Flag]] = None,
+        rules: Optional[Rules] = None,
     ):
         self.players = players
         self.roles = roles
         self.active_rules = rules or _default_rules[len(players)]
+        if flags is None:
+            flags = set()
+        self.flags = flags
         evils = self.active_rules.total_evil
         goods = len(players) - evils
         evil_roles = [r for r in roles if r.value.side == Side.EVIL]
@@ -340,11 +351,11 @@ class Game:
         )
         return merlin_dead
 
-    async def play(self, quests: bool = True) -> None:
+    async def play(self) -> None:
         await asyncio.gather(
             *[self.send_initial_info(idx) for idx in range(len(self.player_map))]
         )
-        if not quests:
+        if Flag.NoQuests in self.flags:
             return
         score: Dict[Side, int] = {s: 0 for s in Side}
         for quest_idx, quest in enumerate(self.active_rules.quests):

@@ -13,6 +13,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     Tuple,
     TypeVar,
 )
@@ -131,11 +132,15 @@ class Vote(enum.Enum):
 
 class Game(avalon.Game):
 
-    def __init__(self, roles: List[avalon.Role]):
+    def __init__(
+        self,
+        roles: List[avalon.Role],
+        flags: Optional[Set[avalon.Flag]] = None,
+    ):
         self.tplayers = [Player(f"p{i}") for i in range(2)]
         self.tcommanders = itertools.cycle(self.tplayers)
         players: List[avalon.Player] = [p for p in self.tplayers]
-        super().__init__(players, roles, RULES_1V1)
+        super().__init__(players, roles, flags, RULES_1V1)
 
     async def role_ctr(self) -> "collections.Counter[avalon.Role]":
         roles = await asyncio.gather(*[p.get_role() for p in self.tplayers])
@@ -189,8 +194,8 @@ class Game(avalon.Game):
 class TestAvalon:
     @pytest.mark.asyncio
     async def test_simple(self) -> None:
-        game = Game([])
-        await game.play(quests=False)
+        game = Game([], {avalon.Flag.NoQuests})
+        await game.play()
         ctr = await game.role_ctr()
         assert ctr[avalon.Role.Minion] == 1
         assert ctr[avalon.Role.Servant] == 1
@@ -201,8 +206,8 @@ class TestAvalon:
             avalon.Role.Merlin,
             avalon.Role.Assassin,
         ]
-        game = Game(roles)
-        await game.play(quests=False)
+        game = Game(roles, {avalon.Flag.NoQuests})
+        await game.play()
         ctr = await game.role_ctr()
         for role in roles:
             assert ctr[role] == 1
@@ -338,6 +343,6 @@ class TestAvalon:
 
     @pytest.mark.asyncio
     async def test_broken_rules(self) -> None:
-        game = avalon.Game([], [], avalon.Rules(0, []))
+        game = avalon.Game([], [], set(), avalon.Rules(0, []))
         with pytest.raises(ValueError):
             await game.play()
