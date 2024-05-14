@@ -47,11 +47,17 @@ class DiscordPlayer(avalon.Player):
         assert isinstance(ret, str)
         return ret
 
-    async def input_players(self, content: str, count: int) -> List[str]:
+    async def input_players(
+        self,
+        content: str,
+        count: int,
+        exclude: Set[str],
+    ) -> List[str]:
         def view(chosen: List[str]) -> discord.ui.View:
             v = discord.ui.View()
             for opt in self.options:
-                names: List[str] = []
+                if opt.mention in exclude:
+                    continue
                 if opt.mention in chosen:
                     style = discord.ButtonStyle.success
                     disabled = True
@@ -61,6 +67,7 @@ class DiscordPlayer(avalon.Player):
                 else:
                     style = discord.ButtonStyle.secondary
                     disabled = True
+                names: List[str] = []
                 if opt.nick is not None:
                     names.append(opt.nick)
                 names.append(opt.name)

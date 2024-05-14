@@ -56,7 +56,12 @@ class Player(avalon.Player):
             self.wait_msgs.set_result(None)
         self.msgs.append(msg)
 
-    async def input_players(self, msg: str, count: int) -> List[str]:
+    async def input_players(
+        self,
+        msg: str,
+        count: int,
+        exclude: Set[str],
+    ) -> List[str]:
         await self.send(msg)
         return await self.nominate_channel.consume()
 

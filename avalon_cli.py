@@ -2,7 +2,7 @@
 
 import asyncio
 import socket
-from typing import List
+from typing import List, Set
 
 import avalon
 
@@ -26,7 +26,12 @@ class CliPlayer(avalon.Player):
         data = await self.read()
         return data
 
-    async def input_players(self, msg: str, count: int) -> List[str]:
+    async def input_players(
+        self,
+        msg: str,
+        count: int,
+        exclude: Set[str],
+    ) -> List[str]:
         while True:
             await self.send(msg)
             reply = (await self.input()).split(" ")

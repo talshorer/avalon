@@ -119,7 +119,12 @@ class Player(abc.ABC):
     async def send(self, msg: str) -> None: ...
 
     @abc.abstractmethod
-    async def input_players(self, msg: str, count: int) -> List[str]: ...
+    async def input_players(
+        self,
+        msg: str,
+        count: int,
+        exclude: Set[str],
+    ) -> List[str]: ...
 
     @abc.abstractmethod
     async def input_vote(self, msg: str) -> bool: ...
@@ -218,7 +223,8 @@ class Game:
         if flags is None:
             flags = set()
         self.flags = flags
-        self.next_lady_target = players[-1]
+        self.lady_excludes: Set[str] = set()
+        self.set_next_lady_target(players[-1])
         evils = self.active_rules.total_evil
         goods = len(players) - evils
         evil_roles = [r for r in roles if r.value.side == Side.EVIL]
@@ -233,6 +239,10 @@ class Game:
         random.shuffle(all_roles)
         self.player_map = list(zip(players, all_roles))
         self.commander_order = itertools.cycle(self.players)
+
+    def set_next_lady_target(self, player: Player) -> None:
+        self.next_lady_target = player
+        self.lady_excludes.add(player.name)
 
     async def broadcast(self, msg: str) -> None:
         await asyncio.gather(*[player.send(msg) for player in self.players])
@@ -263,8 +273,11 @@ class Game:
         selector: Player,
         msg: str,
         count: int,
+        exclude: Optional[Set[str]],
     ) -> List[Player]:
-        group = await selector.input_players(msg, count)
+        if exclude is None:
+            exclude = set()
+        group = await selector.input_players(msg, count, exclude)
         assert len(group) == count
         knights = [player for player in self.players if player.name in group]
         assert len(knights) == count
@@ -277,6 +290,7 @@ class Game:
             commander,
             f"Lord commander! Select {quest.num_players} knights to go on this quest!",
             quest.num_players,
+            None,
         )
         knight_names = " ".join([k.name for k in knights])
         await self.broadcast(
@@ -348,13 +362,14 @@ class Game:
             target,
             "Whose allegiance would you like the Lady of the Lake to reveal?",
             1,
+            self.lady_excludes,
         )
         (role,) = [role for player, role in self.player_map if player is chosen]
         await target.send(lady_reveal(chosen.name, role.value.side))
         await self.broadcast(
             f"The Lady of the Lake revealed the allegiance of {chosen.name} to {target.name}"
         )
-        self.next_lady_target = chosen
+        self.set_next_lady_target(chosen)
 
     async def last_ditch_assassination(self) -> bool:
         def find_player(role: Role) -> Optional[Player]:
@@ -370,7 +385,7 @@ class Game:
         await self.broadcast(
             "The forces of evil have one last chance to win by murdering Merlin"
         )
-        (murdered,) = await self.input_players(assassin, ASSASSINATE, 1)
+        (murdered,) = await self.input_players(assassin, ASSASSINATE, 1, None)
         merlin_dead = merlin is murdered
         yes_or_no = "not " if not merlin_dead else ""
         await self.broadcast(
