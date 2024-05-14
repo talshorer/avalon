@@ -268,7 +268,7 @@ class Game:
             "\n".join(
                 [
                     "=" * 40,
-                    f"We are going on a quest!",
+                    "We are going on a quest!",
                     f"{quest.num_players} knights will go on this quest",
                     f"This quest will fail if {quest.required_fails} participant{noun_s} betray{verb_s} us",
                 ]
@@ -286,7 +286,7 @@ class Game:
             await self.broadcast(
                 "\n".join(
                     [
-                        f"The table voted thus:",
+                        "The table voted thus:",
                         *[
                             k + ": " + ("aye" if v else "nay")
                             for k, v in go_vote.items()

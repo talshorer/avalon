@@ -1,15 +1,13 @@
 #! /usr/bin/python3
 
 import asyncio
-import dataclasses
 import enum
 import os
 import traceback
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Awaitable, Dict, List, Optional, Union
 
 import discord
 import dotenv
-from typing_extensions import ParamSpec
 
 import avalon
 

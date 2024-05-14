@@ -4,7 +4,6 @@ import contextlib
 import enum
 import functools
 import itertools
-import re
 from typing import (
     AsyncIterator,
     Callable,
