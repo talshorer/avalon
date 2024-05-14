@@ -4,7 +4,7 @@ import asyncio
 import dataclasses
 import enum
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
 import discord
 import dotenv
@@ -48,12 +48,11 @@ class DiscordPlayer(avalon.Player):
     def set_options(self, options: List[NominationOption]) -> None:
         self.options = options
 
-    def arm_waiter(self) -> None:
-        waiters[self.name] = asyncio.Future()
-
-    async def interact(self) -> discord.Interaction:
-        await waiters[self.name]
-        return waiters.pop(self.name).result()
+    async def interact(self, aw: Awaitable[Any]) -> discord.Interaction:
+        fut: asyncio.Future[discord.Interaction] = asyncio.Future()
+        waiters[self.name] = fut
+        await asyncio.gather(aw, fut)
+        return fut.result()
 
     @staticmethod
     def button_data(interaction: discord.Interaction) -> str:
@@ -85,17 +84,13 @@ class DiscordPlayer(avalon.Player):
                 )
             return v
 
-        self.arm_waiter()
         chosen: List[str] = []
-        asyncio.create_task(self.member.send(content=content, view=view(chosen)))
+        aw: Awaitable[Any] = self.member.send(content=content, view=view(chosen))
         for _ in range(count):
-            interaction = await self.interact()
+            interaction = await self.interact(aw)
             chosen.append(self.button_data(interaction))
-            if len(chosen) < count:
-                self.arm_waiter()
-            asyncio.create_task(
-                interaction.response.edit_message(content=content, view=view(chosen))
-            )
+            aw = interaction.response.edit_message(content=content, view=view(chosen))
+        await aw
         return chosen
 
     async def input_vote(self, content: str) -> bool:
@@ -122,13 +117,11 @@ class DiscordPlayer(avalon.Player):
                 )
             return v
 
-        self.arm_waiter()
-        asyncio.create_task(self.member.send(content=content, view=view(False, None)))
-        interaction = await self.interact()
-        reply = Vote(self.button_data(interaction))
-        asyncio.create_task(
-            interaction.response.edit_message(content=content, view=view(True, reply))
+        interaction = await self.interact(
+            self.member.send(content=content, view=view(False, None))
         )
+        reply = Vote(self.button_data(interaction))
+        await interaction.response.edit_message(content=content, view=view(True, reply))
         return Vote(reply) is Vote.YES
 
     async def send(self, msg: str) -> None:
@@ -181,8 +174,8 @@ async def on_message(message: discord.Message) -> None:
 
 @client.event
 async def on_interaction(interaction: discord.Interaction) -> None:
-    waiter = waiters.get(to_mention(interaction.user))
-    if waiter:
+    waiter = waiters.pop(to_mention(interaction.user), None)
+    if waiter is not None:
         waiter.set_result(interaction)
 
 
