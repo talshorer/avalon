@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 
+import argparse
 import asyncio
 import enum
 import os
@@ -113,7 +114,7 @@ class DiscordPlayer(avalon.Player):
 
 
 class Client(discord.Client):
-    def __init__(self) -> None:
+    def __init__(self, summon: str) -> None:
         super().__init__(
             intents=discord.Intents(
                 messages=True,
@@ -121,6 +122,7 @@ class Client(discord.Client):
                 guilds=True,
             ),
         )
+        self.summon = f"!{summon} "
         self.waiters: Dict[str, "asyncio.Future[discord.Interaction]"] = {}
 
     @staticmethod
@@ -151,9 +153,8 @@ class Client(discord.Client):
         if message.author == self.user:
             return
         assert isinstance(message.channel, discord.TextChannel)
-        trigger = "!avalon "
         content = message.content
-        if content.startswith(trigger):
+        if content.startswith(self.summon):
             print(f"Summon message on channel {message.channel.name}")
             print(f"Content: {content}")
             players: List[avalon.Player] = []
@@ -198,8 +199,11 @@ class Client(discord.Client):
 async def main() -> None:
     dotenv.load_dotenv()
     token = os.getenv("DISCORD_TOKEN_AVALON")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--summon", type=str, default="avalon")
+    args = parser.parse_args()
     assert token is not None
-    await Client().start(token)
+    await Client(args.summon).start(token)
 
 
 if __name__ == "__main__":
