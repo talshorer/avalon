@@ -12,14 +12,6 @@ from typing_extensions import ParamSpec
 
 import avalon
 
-client = discord.Client(
-    intents=discord.Intents(
-        messages=True,
-        message_content=True,
-        guilds=True,
-    ),
-)
-
 
 Member = Union[discord.User, discord.Member]
 
@@ -141,55 +133,61 @@ def get_role(part: str) -> Optional[avalon.Role]:
             return role
     return None
 
+class Client(discord.Client):
+    def __init__(self) -> None:
+        super().__init__(
+            intents=discord.Intents(
+                messages=True,
+                message_content=True,
+                guilds=True,
+            ),
+        )
 
-@client.event
-async def on_message(message: discord.Message) -> None:
-    if message.author == client.user:
-        return
-    assert isinstance(message.channel, discord.TextChannel)
-    trigger = "!avalon "
-    content = message.content
-    if content.startswith(trigger):
-        print(f"Summon message on channel {message.channel.name}")
-        print(f"Content: {content}")
-        players: List[avalon.Player] = []
-        roles = []
-        for part in content.split()[1:]:
-            member = get_member(part, message.mentions)
-            if member is not None:
-                players.append(DiscordPlayer(member))
-                continue
-            role = get_role(part)
-            if role is not None:
-                roles.append(role)
-                continue
-            await message.channel.send(f"Sorry, don't know what to do with {part}")
+    async def on_message(self, message: discord.Message) -> None:
+        if message.author == self.user:
             return
-        options = [NominationOption(player) for player in players]
-        for player in players:
-            assert isinstance(player, DiscordPlayer)
-            player.set_options(options)
-        await avalon.Game(players, roles).play()
+        assert isinstance(message.channel, discord.TextChannel)
+        trigger = "!avalon "
+        content = message.content
+        if content.startswith(trigger):
+            print(f"Summon message on channel {message.channel.name}")
+            print(f"Content: {content}")
+            players: List[avalon.Player] = []
+            roles = []
+            for part in content.split()[1:]:
+                member = get_member(part, message.mentions)
+                if member is not None:
+                    players.append(DiscordPlayer(member))
+                    continue
+                role = get_role(part)
+                if role is not None:
+                    roles.append(role)
+                    continue
+                await message.channel.send(f"Sorry, don't know what to do with {part}")
+                return
+            options = [NominationOption(player) for player in players]
+            for player in players:
+                assert isinstance(player, DiscordPlayer)
+                player.set_options(options)
+            await avalon.Game(players, roles).play()
 
 
-@client.event
-async def on_interaction(interaction: discord.Interaction) -> None:
-    waiter = waiters.pop(to_mention(interaction.user), None)
-    if waiter is not None:
-        waiter.set_result(interaction)
+    async def on_interaction(self, interaction: discord.Interaction) -> None:
+        waiter = waiters.pop(to_mention(interaction.user), None)
+        if waiter is not None:
+            waiter.set_result(interaction)
 
 
-@client.event
-async def on_ready() -> None:
-    assert client.user is not None
-    print(f"{client.user.name} has connected to Discord!")
+    async def on_ready(self, ) -> None:
+        assert self.user is not None
+        print(f"{self.user.name} has connected to Discord!")
 
 
 async def main() -> None:
     dotenv.load_dotenv()
     token = os.getenv("DISCORD_TOKEN_AVALON")
     assert token is not None
-    await client.start(token)
+    await Client().start(token)
 
 
 if __name__ == "__main__":
