@@ -152,12 +152,10 @@ class Client(discord.Client):
             players: List[avalon.Player] = []
             roles = []
             for part in content.split()[1:]:
-                member = self.get_member(part, message.mentions)
-                if member is not None:
+                if (member := self.get_member(part, message.mentions)) is not None:
                     players.append(DiscordPlayer(member, self))
                     continue
-                role = self.get_role(part)
-                if role is not None:
+                if (role := self.get_role(part)) is not None:
                     roles.append(role)
                     continue
                 await message.channel.send(f"Sorry, don't know what to do with {part}")
