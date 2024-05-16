@@ -125,8 +125,11 @@ RULES_1V1 = avalon.Rules(
         avalon.Quest(1, 1),
         avalon.Quest(1, 1),
         avalon.Quest(1, 1),
+        avalon.Quest(1, 1),
+        avalon.Quest(1, 1),
     ],
 )
+NR_QUESTS_QUICK = len(RULES_1V1.quests) // 2 + 1
 
 
 class Vote(enum.Enum):
@@ -283,7 +286,8 @@ class TestAvalon:
             assert result is expected
 
     async def long_game_test(self, betray: bool, expected: avalon.Side) -> None:
-        await self.full_game_test([], [True, False, betray], expected)
+        betray_per_mission = [True, False] * (NR_QUESTS_QUICK - 1) + [betray]
+        await self.full_game_test([], betray_per_mission, expected)
 
     @pytest.mark.asyncio
     async def test_long_game_good_victory(self) -> None:
@@ -294,7 +298,7 @@ class TestAvalon:
         await self.long_game_test(True, avalon.Side.EVIL)
 
     async def quick_game_test(self, betray: bool, expected: avalon.Side) -> None:
-        await self.full_game_test([], [betray, betray], expected)
+        await self.full_game_test([], [betray] * NR_QUESTS_QUICK, expected)
 
     @pytest.mark.asyncio
     async def test_quick_game_good_victory(self) -> None:
@@ -309,8 +313,8 @@ class TestAvalon:
     async def assassin_test(self, hit: bool, expected: avalon.Side) -> None:
         with self.game(self.ASSASSIN_TEST_ROLES) as game:
             map = {await player.get_role(): player for player in game.tplayers}
-            await game.run_quest(False)
-            await game.run_quest(False)
+            for _ in range(NR_QUESTS_QUICK):
+                await game.run_quest(False)
             assassin = map[avalon.Role.Assassin]
             merlin = map[avalon.Role.Merlin]
             await assassin.expect_msg(avalon.ASSASSINATE)
@@ -331,7 +335,7 @@ class TestAvalon:
     async def test_no_assassination_on_evil_win(self) -> None:
         await self.full_game_test(
             self.ASSASSIN_TEST_ROLES,
-            [True, True],
+            [True] * NR_QUESTS_QUICK,
             avalon.Side.EVIL,
         )
 
@@ -360,6 +364,6 @@ class TestAvalon:
             role = await p0.get_role()
             await game.run_quest(False)
             await game.run_quest(True)
-            # score is now 1:1, game continues, lady triggers after second quest
+            # lady first triggers after second quest
             await p1.nominate([p0.name])
             await p1.expect_msg(avalon.Game.lady_reveal(p0.name, role.value.side))
