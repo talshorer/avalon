@@ -360,10 +360,14 @@ class TestAvalon:
     @pytest.mark.asyncio
     async def test_lady_of_the_lake(self) -> None:
         with self.game([], {avalon.Flag.Lady}) as game:
-            p0, p1 = game.tplayers
-            role = await p0.get_role()
+            roles = await asyncio.gather(*[p.get_role() for p in game.tplayers])
             await game.run_quest(False)
-            await game.run_quest(True)
-            # lady first triggers after second quest
-            await p1.nominate([p0.name])
-            await p1.expect_msg(avalon.Game.lady_reveal(p0.name, role.value.side))
+            for i in range(2):
+                # lady triggers after second quest and each subsequent quest
+                await game.run_quest(True)
+                visited_by = game.tplayers[1 - i]
+                nominate = game.tplayers[i].name
+                await visited_by.nominate([nominate])
+                await visited_by.expect_msg(
+                    avalon.Game.lady_reveal(nominate, roles[i].value.side)
+                )
