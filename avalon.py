@@ -258,7 +258,7 @@ class Game:
             return await player.input_vote(onwhat)
 
         results = await asyncio.gather(*[vote_one(player) for player in players])
-        return {player.name: result for player, result in zip(self.players, results)}
+        return {player.name: result for player, result in zip(players, results)}
 
     async def send_initial_info(self, idx: int) -> None:
         player, role = self.player_map[idx]
